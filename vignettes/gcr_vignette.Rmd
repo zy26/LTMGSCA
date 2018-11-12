@@ -1,0 +1,371 @@
+---
+title: "LTMG - GCR track (LTMG->biclustering analysis)"
+author:
+- Chi Zhang
+- Yu Zhang
+vignette: >
+  %\VignetteIndexEntry{LTMG Tutorial - GCR track}
+  %\VignetteEngine{knitr::rmarkdown}
+output:
+  md_document:
+    variant: gfm
+  pdf_document:
+    latex_engine: xelatex
+    extra_dependencies: ["dcolumn", "rotating", "rotfloat","xeCJK"]
+  html_document:
+    highlight: tango
+    theme: flatly
+  word_document:
+    fig_caption: yes
+    highlight: tango
+    md_extensions: -autolink_bare_uris
+bibliography: bibliography.bib
+---
+
+```{r setup, include=FALSE, cache = TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+options(width = 60)
+```
+
+# Analysis
+
+We will have a data namely "Yan" for the example of LTMG - GCR (biclustering) pipeline.
+
+Basically, we may need the following steps for this analysis
+
+## (i) a standard data loading function
+
+``` {R, cache = TRUE}
+data0 <- log(as.matrix(read.delim("Yan_expression_RPKM.txt", row.names = 1)))
+``` 
+
+## (ii) running LTMG -> a standard output of LTMG parameters
+
+### Select genes
+Genes with non-zero expression in more than 5 samples in `data0`
+
+``` {R, cache = TRUE}
+selected.genes <- which(rowSums(data0 > 0) > 5)
+print(head(selected.genes, 30))
+```
+
+### Run LTMG for the selected genes
+`LTMG -> output`
+list(`N`: number of peaks; a 3 $\times$ `N` matrix: `A`, `U`, `S`; If `Zcut` (If 0 expression is more than 5, `Zcut`); Iteration number, upper limit 1000)
+
+``` {R, cache = TRUE}
+library(LTMGSCA)
+for (gene in head(selected.genes, 3)) {
+  for (k in 1:5) {
+    print(SeparateKRpkmNew(x = data0[gene, ], n = 100, q = 0, k = k, err = 1e-10))
+  }
+}
+```
+
+### Here we have the BIC functions:
+
+``` {R, cache = TRUE}
+BIC_f_zcut <- function(y, rrr, Zcut) {
+  n <- length(y)
+  nparams <- nrow(rrr) * 3
+  w <- rrr[, 1]
+  u <- rrr[, 2]
+  sig <- rrr[, 3]
+  cc <- c()
+  y0 <- y[which(y >= Zcut)]
+  y1 <- y[which(y < Zcut)]
+  y1 <- y1 * 0 + Zcut
+  for (i in 1:nrow(rrr)) {
+    c0 <- dnorm(y0, u[i], sig[i]) * w[i]
+    c1 <- (1 - pnorm(y1, u[i], sig[i])) * w[i]
+    c <- c(c0, c1)
+    cc <- rbind(cc, c)
+  }
+  d <- apply(cc, 2, sum)
+  e <- sum(log(d))
+  f <- e * 2 - nparams * log(n)
+  return (f)
+}
+
+BIC_f_zcut2 <- function(y, rrr, Zcut) {
+  n <- length(y)
+  nparams <- nrow(rrr) * 3
+  w <- rrr[, 1]
+  u <- rrr[, 2]
+  sig <- rrr[, 3]
+  y0 <- y[which(y >= Zcut)]
+  cc <- c()
+  for (i in 1:nrow(rrr)) {
+    c <- dnorm(y0, u[i], sig[i]) * w[i]
+    cc <- rbind(cc, c)
+  }
+  d <- apply(cc, 2, sum)
+  e <- sum(log(d))
+  f <- e * 2 - nparams * log(n)
+  return (f)
+}
+```
+ 
+We can now get `f` value using `BIC_f_zcut2()`.
+
+``` {R, cache = TRUE}
+for (k in 1:5) {
+  rrr <- SeparateKRpkmNew(x = data0[selected.genes[1], ], n = 100, q = 0, k = k, err = 1e-10)
+  print(BIC_f_zcut2(y = data0[selected.genes[1], ], rrr, 0))
+}
+
+```
+
+We are only print while `k > 1`.
+
+``` {R, cache = TRUE}
+GetBestK <- function(x, n, q, err = 1e-10){
+  best.bic <- -Inf
+  best.k <- 0
+  best.result <- c(0, 0, 0)
+  for (k in 1:7) {
+    rrr <- SeparateKRpkmNew(x = x, n = n, q = q, k = k, err = err)
+    bic <- BIC_f_zcut2(y = x, rrr, q)
+    if(is.nan(bic)) {
+      bic <- -Inf
+    }
+    if (bic >= best.bic) {
+      best.bic <- bic
+      best.k <- k
+      best.result <- rrr
+    } else {
+      return(list(k = best.k, bic = best.bic, result = best.result))
+    }
+  }
+  return(list(k = 0, bic = 0, result = c(0, 0, 0)))
+}
+```
+
+``` {R, cache = TRUE}
+for (gene in head(selected.genes, 30)) {
+  best <- GetBestK(x = data0[gene, ], n = 100, q = 0, err = 1e-10)
+  if (best[1] > 1) {
+    print(gene)
+  }
+}
+
+```
+
+This is the 10th one:
+
+``` {R, cache = TRUE}
+best <- GetBestK(x = data0[10, ], n = 100, q = 0, err = 1e-10)
+print(best)
+
+hist(data0[10,], breaks = 60)
+
+```
+
+
+## (iii) LTMG -> discretization
+We have the following functions ready for this step:
+
+1. `calculate_prob_sep_Zcut`, 
+2. `discretization_method_1_LLR_mean`, and
+3. `Build_R_matrix`.
+
+``` {R, cache = TRUE}
+calculate_prob_sep_Zcut <- function(data1, Zcut, a, u, sig) {
+  cc <- matrix(0, length(a), length(data1))
+  colnames(cc) <- names(data1)
+  for (i in 1:length(a)) {
+    c <- a[i] / sig[i] * exp(-(data1 - u[i]) ^ 2 / (2 * sig[i] ^ 2))
+    cc[i, ] <- c
+  }
+  cut_p <- rep(0, length(a))
+  for (i in 1:length(a)) {
+    cut_p[i] <- a[i] * pnorm(Zcut, u[i], sig[i])
+  }
+  for (i in 1:ncol(cc)) {
+    if (data1[i] < Zcut) {
+      cc[, i] <- cut_p
+    }
+  }
+  cc[which(is.na(cc) == 1)] <- 0
+  return(cc)
+}
+```
+
+``` {R, cache = TRUE}
+discretization_method_1_LLR_mean <- function(y, aaa, ccc, LLR_cut = 2) {
+  K <- 1 / LLR_cut + 1
+  if (nrow(aaa) == 1) {
+    print("Only one class")
+    return(y)
+  } else {
+    discretized_y <- rep(0, length(y))
+    for (i in 1:ncol(ccc)) {
+      ll <- which(ccc[, i] == max(ccc[, i]))[1]
+      if ((max(ccc[, i])/sum(ccc[, i])) > (1/K)) {
+        discretized_y[i] <- ll
+      }
+    }
+    blocks <- c()
+    st_c <- 1
+    end_c <- 1
+    st_c_v <- y[order(y)[1]]
+    end_c_v <- y[order(y)[1]]
+    label_c <- discretized_y[order(y)[1]]
+    for (i in 2:length(order(y))) {
+      if (discretized_y[order(y)[i]] == discretized_y[order(y)[i - 1]]) {
+        end_c <- i
+        end_c_v <- y[order(y)[i]]
+        if (i == length(order(y))) {
+          end_c <- i
+          end_c_v <- y[order(y)[i]]
+          blocks <- rbind(blocks, c(st_c, end_c, st_c_v, end_c_v, label_c))
+        }
+      } else {
+        blocks <- rbind(blocks, c(st_c, end_c, st_c_v, end_c_v, 
+          label_c))
+        label_c <- discretized_y[order(y)[i]]
+        st_c <- i
+        end_c <- i
+        st_c_v <- y[order(y)[i]]
+        end_c_v <- y[order(y)[i]]
+        if (i == length(order(y))) {
+          end_c <- i
+          end_c_v <- y[order(y)[i]]
+          blocks <- rbind(blocks, c(st_c, end_c, st_c_v, end_c_v, label_c))
+        }
+      }
+    }
+    if (nrow(blocks) > 1) {
+      for (i in 1:nrow(blocks)) {
+        if (blocks[i, 5] != 0) {
+          tg_i <- blocks[i, 5]
+          if (!((blocks[i, 3] <= aaa[tg_i, 2]) & (blocks[i, 4] >= aaa[tg_i, 2]))) {
+          blocks[i, 5] <- 0
+          }
+        }
+      }
+      for (i in 1:nrow(blocks)) {
+        discretized_y[order(y)[blocks[i, 1]:blocks[i, 2]]] <- blocks[i, 5]
+      }
+    }
+    return(discretized_y)
+  }
+}
+```
+
+``` {R, cache = TRUE}
+Build_R_matrix <- function(cc, Zcut0, U, Gname) {
+  tg_s <- intersect(which(U > Zcut0), unique(cc))
+  dd <- c()
+  nc <- c()
+  if (length(tg_s) > 0) {
+    for (i in 1:length(tg_s)) {
+      nc <- c(nc, paste(Gname, tg_s[i], sep = "__"))
+      ccc <- (cc == tg_s[i]) * 1
+      dd <- rbind(dd, ccc)
+    }
+  }
+  rownames(dd) <- nc
+  return(dd)
+}
+```
+
+`best$result` is a `K` $\times$ 3 matrix with 1st, 2nd and 3rd columns are the `A`, `U`, `S` of the gene
+`x` is the normalized expression level
+
+``` {R, cache = TRUE}
+i <- 4
+x <- data0[i, ]
+Zcut0 <- 0
+best <- GetBestK(x = x, n = 1000, q = Zcut0, err = 1e-10)
+
+pp <- calculate_prob_sep_Zcut(x, Zcut0, best$result[, 1], best$result[, 2], best$result[, 3])
+cc <- discretization_method_1_LLR_mean(x, best$result, pp, LLR_cut = 0.1)
+dd <- Build_R_matrix(cc, Zcut0, best$result[, 2], rownames(data0)[i])
+
+print(x)
+print(pp)
+print(cc)
+print(dd)
+```
+
+``` {R, cache = TRUE}
+i <- 5
+x <- data0[i, ]
+Zcut0 <- 0
+best <- GetBestK(x = x, n = 1000, q = Zcut0, err = 1e-10)
+
+pp <- calculate_prob_sep_Zcut(x, Zcut0, best$result[, 1], best$result[, 2], best$result[, 3])
+cc <- discretization_method_1_LLR_mean(x, best$result, pp, LLR_cut = 0.1)
+dd <- Build_R_matrix(cc, Zcut0, best$result[, 2], rownames(data0)[i])
+
+print(x)
+print(pp)
+print(cc)
+print(dd)
+```
+
+## (iv) directly apply qubic from the QUBIC package
+
+We are trying save the result to a file first.
+``` {R, cache = TRUE}
+WriteQubicInput <- function(file.name, data0, genes, q = 0, err = 1e-10) {
+  cat("o", colnames(data0), "\n", file = file.name)
+  for (i in genes) {
+    cat(i, colnames(data0), "\n", file = "progress")
+    x <- data0[i, ]
+    Zcut0 <- q
+    best <- GetBestK(x = x, n = 1000, q = Zcut0, err = 1e-10)
+    if (best$k == 0) {
+      next
+    }
+    pp <- calculate_prob_sep_Zcut(x, Zcut0, best$result[, 1], best$result[, 2], best$result[, 3])
+    cc <- discretization_method_1_LLR_mean(x, best$result, pp, LLR_cut = 0.1)
+    dd <- Build_R_matrix(cc, Zcut0, best$result[, 2], rownames(data0)[i])
+    write.table(dd, file = file.name, col.names = FALSE, append = TRUE, quote = FALSE)
+  }
+}
+```
+
+``` {R, cache = TRUE}
+system.time(WriteQubicInput("qubic_input_head30", data0, head(selected.genes, 30)))
+```
+
+This may be slow...
+``` {R, cache = TRUE}
+print(length(selected.genes))
+qubic.file = "qubic_input"
+if (!file.exists(qubic.file)) {
+  WriteQubicInput(qubic.file, data0, selected.genes)
+}
+```
+
+
+It is the time to read all the data back.
+
+``` {R, cache = TRUE}
+qubic.input <- as.matrix(read.table(qubic.file, row.names = 1, header = TRUE))
+```
+
+Run QUBIC[@zhang16], need several minute.
+
+``` {R, cache = TRUE}
+library(QUBIC)
+if (!file.exists("res.RData")) {
+  res <- qubiclust_d(qubic.input)
+  save(res, file="res.RData")
+} else {
+  load("res.RData")
+}
+```
+
+## (v) results summary
+
+``` {R, cache = TRUE}
+res
+biclust::summary(res)
+```
+
+# References
+
+

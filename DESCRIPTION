@@ -1,0 +1,12 @@
+Package: LTMGSCA
+Type: Package
+Title: An R package for Single Cell RNA-seq data analysis within the Left Truncated Mixture Gaussian scheme
+Version: 0.1.0
+Author: Chi Zhang, Yu Zhang
+Maintainer: Yu Zhang <zy26@jlu.edu.cn>
+Description: With an inference of the heterogeneous TRS of each gene by the LTMG model, analysis of following problems for a scRNA-seq data, including (1) differentially expressed genes, (2) transcriptional bursts, (3) cell type specific gene regulations, (4) cell type inference, and (5) gene co-regulation module identification, can be formulated and computed by implementing LTMG model with other methods. 
+    An R package of LTMG model based single cell RNA-seq analysis tools.
+    Specifically, the package includes the fitting of LTMG and LTMG-2LR models for single cell RNA-seq data, LTMG-DEG, LTMG based likelihood assessment, outlier gene and cell identification, identification of phenotypic feature associated TRS, cell type inference, and gene co-regulation module identification.
+License: What license is it under?
+Encoding: UTF-8
+LazyData: true

@@ -1,0 +1,717 @@
+---
+title: "LTMG - DEG track (for differential expression analysis)"
+author:
+- Chi Zhang
+- Yu Zhang
+vignette: >
+  %\VignetteIndexEntry{LTMG Tutorial - DEG track}
+  %\VignetteEngine{knitr::rmarkdown}
+output:
+  md_document:
+    variant: gfm
+  pdf_document:
+    latex_engine: xelatex
+    extra_dependencies: ["dcolumn", "rotating", "rotfloat","xeCJK"]
+  html_document:
+    highlight: tango
+    theme: flatly
+  word_document:
+    fig_caption: yes
+    highlight: tango
+    md_extensions: -autolink_bare_uris
+bibliography: bibliography.bib
+---
+
+```{r setup, include=FALSE, cache = TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+options(width = 60)
+```
+
+# Example data
+
+We will use Melissa Fishel's data as the example data. There are five separated data sets.
+
+Basically, we may need the following steps for this analysis, let's use `H_si` and `H_sc` data as the example.
+
+## a standard data loading function and an condition index generation method
+
+```matrix_generation```
+
+``` {R, cache = TRUE}
+tg_keys <- c("Fishel_scFPKM_sc1.txt", "Fishel_scFPKM_sc2.txt", "Fishel_scFPKM_si_APE1.txt", 
+  "Fishel_scFPKM_h_sc0.txt", "Fishel_scFPKM_h_si_APE1.txt")
+tg_conds_meta <- cbind(c(0, 0, 1, 0, 1), c(0, 0, 0, 1, 1))
+colnames(tg_conds_meta) <- c("Si", "H")
+rownames(tg_conds_meta) <- tg_keys
+
+Data_list <- list()
+Stat_list <- list()
+Data_0 <- c()
+for (i in 1:length(tg_keys)) {
+  Data_list[[i]] <- as.matrix(read.delim(tg_keys[i], row.names = 1))
+  print(i)
+  print(dim(Data_list[[i]]))
+  Data_0 <- cbind(Data_0, Data_list[[i]])
+}
+``` 
+
+## running LTMG for the complete data
+
+### Select genes
+Genes with non-zero expression in more than 5 samples in ```Data_0```
+
+``` {R, cache = TRUE}
+selected.genes <- which(rowSums(Data_0 > 0) > 5)
+print(head(selected.genes))
+```
+
+### Run LTMG for the selected genes
+Run LTMG for ```Data_0```
+```gene_stat_all``` is a ```Data_list[[i]]```*1 vector the number of peaks for each gene identified by LTMG over ```Data_0```
+
+``` {R, cache = TRUE}
+library(LTMGSCA)
+
+x <- Data_0[195, ]
+
+for (k in 1:5) {
+  print(LTMGSCA::LogSeparateKRpkmNew(x = x, n = 100, q = min(x[which(x > 0)]), k = k, err = 1e-10))
+}
+```
+
+``` {R, cache = TRUE}
+for (gene in head(selected.genes, 3)) {
+  x <- Data_0[gene, ]
+  for (k in 1:5) {
+    print(LTMGSCA::LogSeparateKRpkmNew(x = x, n = 100, q = min(x[which(x > 0)]), k = k, err = 1e-10))
+  }
+}
+```
+
+### Here we have the BIC functions:
+
+``` {R, cache = TRUE}
+BIC_f_zcut <- function(y, rrr, Zcut) {
+  n <- length(y)
+  nparams <- nrow(rrr) * 3
+  w <- rrr[, 1]
+  u <- rrr[, 2]
+  sig <- rrr[, 3]
+  cc <- c()
+  y0 <- y[which(y >= Zcut)]
+  y1 <- y[which(y < Zcut)]
+  y1 <- y1 * 0 + Zcut
+  for (i in 1:nrow(rrr)) {
+    c0 <- dnorm(y0, u[i], sig[i]) * w[i]
+    c1 <- (1 - pnorm(y1, u[i], sig[i])) * w[i]
+    c <- c(c0, c1)
+    cc <- rbind(cc, c)
+  }
+  d <- apply(cc, 2, sum)
+  e <- sum(log(d))
+  f <- e * 2 - nparams * log(n)
+  return (f)
+}
+
+BIC_f_zcut2 <- function(y, rrr, Zcut) {
+  n <- length(y)
+  nparams <- nrow(rrr) * 3
+  w <- rrr[, 1]
+  u <- rrr[, 2]
+  sig <- rrr[, 3]
+  y0 <- y[which(y >= Zcut)]
+  cc <- c()
+  for (i in 1:nrow(rrr)) {
+    c <- dnorm(y0, u[i], sig[i]) * w[i]
+    cc <- rbind(cc, c)
+  }
+  d <- apply(cc, 2, sum)
+  e <- sum(log(d))
+  f <- e * 2 - nparams * log(n)
+  return (f)
+}
+```
+ 
+We can now get ```f``` value using ```BIC_f_zcut2()```.
+
+``` {R, cache = TRUE}
+x <- log(Data_0[3, ])
+for (k in 1:5) {
+  rrr <- LTMGSCA::SeparateKRpkmNew(x = x, n = 100, q = min(x[which(x > 0)]), k = k, err = 1e-10)
+  print(BIC_f_zcut2(y = x, rrr, 0))
+}
+```
+
+``` {R, cache = TRUE}
+GetAll <- function(x, n, q, err = 1e-10){
+  max.k = 5
+  bics <- rep(NA, max.k)
+  results <- vector(mode = "list", length = max.k)
+  for (k in 1:max.k) {
+    results[[k]] <- LTMGSCA::SeparateKRpkmNew(x = x, n = n, q = q, k = k, err = err)
+    bics[k] <- BIC_f_zcut2(y = x, results[[k]], q)
+  }
+  return(list(bics = bics, results = results))
+}
+```
+
+``` {R, cache = TRUE}
+for (gene in head(selected.genes)) {
+  x <- log(Data_0[gene, ])
+  best <- GetAll(x = x, n = 100, q = min(x[which(x > 0)]), err = 1e-10)
+  print(best$bics)
+}
+```
+
+
+## running LTMG-2LR for the genes fitted with less than 2 peaks in (ii)
+
+For all the genes with `N==1,2`, 
+Run LTMG2LR for all conditions (as an example, just for condition pair 1 and 2)
+
+``` {R, cache = TRUE}
+matrix_generation_old <- function(tg_conds_meta, tg_ids) {
+  tg_conds_meta0 <- tg_conds_meta[tg_ids, ]
+  tg_cn <- colnames(tg_conds_meta)[1]
+  tg_conds_meta1 <- as.matrix(tg_conds_meta0[, 1])
+  for (i in 2:ncol(tg_conds_meta1)) {
+    current.t0 <- tg_conds_meta0[, i]
+    if (sum(abs(summary(lm(current.t0 ~ tg_conds_meta1 + 0))$residuals)) > 1e-10) {
+      tg_conds_meta1 <- cbind(tg_conds_meta1, current.t0)
+      tg_cn <- c(tg_cn, colnames(tg_conds_meta)[i])
+      colnames(tg_conds_meta1) <- tg_cn
+    }
+  }
+  for (i in 1:ncol(tg_conds_meta1)) {
+    for (j in 1:ncol(tg_conds_meta1)) {
+      if (i < j) {
+        current.t0 <- tg_conds_meta1[, i] * tg_conds_meta1[, j]
+        if (sum(abs(summary(lm(current.t0 ~ tg_conds_meta1 + 0))$residuals)) > 1e-10) {
+          tg_cn <- c(tg_cn, c(paste(colnames(tg_conds_meta)[i], 
+          colnames(tg_conds_meta)[j], sep = "__")))
+          tg_conds_meta1 <- cbind(tg_conds_meta1, current.t0)
+          colnames(tg_conds_meta1) <- tg_cn
+        }
+      }
+    }
+  }
+  return(tg_conds_meta1)
+}
+
+matrix_generation <- function(tg_conds_meta, tg_ids) {
+  tg_conds_meta0 <- tg_conds_meta[tg_ids, ]
+  if (ncol(tg_conds_meta) == 1) {
+    tg_conds_meta0 <- as.matrix(tg_conds_meta0)
+    colnames(tg_conds_meta0) <- colnames(tg_conds_meta)
+  }
+  tg_cn <- c()
+  tg_conds_meta1 <- c()
+  for (i in 1:ncol(tg_conds_meta0)) {
+    current.t0 <- tg_conds_meta0[, i]
+    if (length(tg_conds_meta1) == 0) {
+      if ((sum(current.t0 == 0) > 0) & (sum(current.t0 == 1) > 0)) {
+        tg_conds_meta1 <- cbind(tg_conds_meta1, current.t0)
+        tg_cn <- c(tg_cn, colnames(tg_conds_meta)[i])
+        colnames(tg_conds_meta1) <- tg_cn
+      }
+    } else {
+      if (sum(abs(summary(lm(current.t0 ~ tg_conds_meta1 + 0))$residuals)) > 1e-05) {
+        if ((sum(current.t0 == 0) > 0) & (sum(current.t0 == 1) > 0)) {
+          tg_conds_meta1 <- cbind(tg_conds_meta1, current.t0)
+          tg_cn <- c(tg_cn, colnames(tg_conds_meta)[i])
+          colnames(tg_conds_meta1) <- tg_cn
+        }
+      }
+    }
+    # print(c(i,tg_cn))
+  }
+  colnames(tg_conds_meta1) <- tg_cn
+  for (i in 1:ncol(tg_conds_meta0)) {
+    for (j in 1:ncol(tg_conds_meta1)) {
+      if (i < j) {
+        current.t0 <- tg_conds_meta1[, i] * tg_conds_meta1[, j]
+        if (sum(abs(summary(lm(current.t0 ~ tg_conds_meta1 + 0))$residuals)) > 1e-10) {
+          if ((sum(current.t0 == 0) > 0) & (sum(current.t0 == 1) > 0)) {
+          tg_cn <- c(tg_cn, c(paste(colnames(tg_conds_meta)[i], 
+            colnames(tg_conds_meta)[j], sep = "__")))
+          tg_conds_meta1 <- cbind(tg_conds_meta1, current.t0)
+          colnames(tg_conds_meta1) <- tg_cn
+          }
+        }
+      }
+    }
+  }
+  colnames(tg_conds_meta1) <- tg_cn
+  return(tg_conds_meta1)
+}
+```
+
+``` {R, cache = TRUE}
+tg_ids <- 1:3
+
+tg_keys0 <- c()
+N <- 0
+for (i in tg_ids) {
+  N <- N + 1
+  tg_keys0[[N]] <- tg_keys[i]
+}
+
+Data_c0 <- c()
+for (i in 1:length(tg_ids)) {
+  Data_c0 <- cbind(Data_c0, Data_list[[tg_ids[i]]])
+}
+
+tg_genes_n <- apply(Data_c0 != 0, 1, sum)
+tg_genes <- names(tg_genes_n)[which(tg_genes_n > 10)]
+
+Design_matrix0 <- matrix_generation(tg_conds_meta, 1:3)
+```
+
+```Build_design_matrix_data_DGE``` is a function to generate data list by using the condition information from ```Design_matrix0```.
+
+``` {R, cache = TRUE}
+Build_design_matrix_data_DGE <- function(Data_list, tg_conds_meta, tg_ids) {
+  Design_matrix0 <- matrix_generation(tg_conds_meta, tg_ids)
+  conds_index <- Design_matrix0[, 1] * 0
+  for (i in 1:ncol(Design_matrix0)) {    
+    conds_index <- conds_index + Design_matrix0[, i] * 2 ^ i
+  }
+  conds_uniq <- unique(conds_index)
+  
+  conds_merged_data <- list()
+  conds_merged_name <- c()
+  Design_matrix_merged <- c()
+  for (i in 1:length(conds_uniq)) {
+    tg_ii <- which(conds_index == conds_uniq[i])
+    data_c <- c()
+    for (j in 1:length(tg_ii)) {
+      data_c <- cbind(data_c, Data_list[[tg_ids[tg_ii[j]]]])
+    }
+    conds_merged_data[[i]] <- data_c
+    Design_matrix_merged <- rbind(Design_matrix_merged, Design_matrix0[tg_ii[1], ])
+    nn <- paste(colnames(Design_matrix0)[1], Design_matrix0[tg_ii[1], 1], sep = "=")
+    if (ncol(Design_matrix0) > 1) {
+      for (j in 2:ncol(Design_matrix0)) {
+        nn <- paste(nn, paste(colnames(Design_matrix0)[j], Design_matrix0[tg_ii[1], j], 
+                              sep = "="), sep = "|")
+      }
+    }
+    conds_merged_name <- c(conds_merged_name, nn)
+  }
+  rownames(Design_matrix_merged) <- conds_merged_name
+  colnames(Design_matrix_merged) <- colnames(Design_matrix0)
+  names(conds_merged_data) <- conds_merged_name
+  ret <- list(Design_matrix0, Design_matrix_merged, conds_merged_data)
+  names(ret) <- c("Design_matrix0", "Design_matrix_merged", "conds_merged_data")
+  return(ret)
+}
+```
+
+``` {R, cache = TRUE}
+tg_ids <- 1:5
+ret <- Build_design_matrix_data_DGE(Data_list, tg_conds_meta, tg_ids)
+Design_matrix0 <- ret[[1]]
+Design_matrix_new <- ret[[2]]
+Data_list_new <- ret[[3]]
+
+Data_0 <- c()
+Conds_meta <- c()
+for (i in 1:length(Data_list_new)) {
+  Data_0 <- cbind(Data_0, Data_list_new[[i]])
+  Conds_meta <- cbind(Conds_meta, matrix(Design_matrix_new[i, ], 
+    ncol(Design_matrix_new), ncol(Data_list_new[[i]]), byrow = F))
+}
+rownames(Conds_meta) <- colnames(ret[[2]])
+colnames(Conds_meta) <- colnames(Data_0)
+
+print(Design_matrix0)
+print(Design_matrix_new)
+Data_0 <- c()
+for (i in 1:length(Data_list_new)) {
+  Data_0 <- cbind(Data_0, Data_list_new[[i]])
+}
+tg_genes <- names(which(apply(Data_0 > 0, 1, sum) > 10))
+```
+
+Take the value of Zcut. For each vector, calculate Zcut, then the largest Zcut in these Zcuts can be used as Zcut running LTMG2LR.
+
+``` {R, cache = TRUE}
+LTMG2LR_DEG_test_new <- function(Data_conditions, Stat_list, Conds_meta, Design_matrix0, ROUNDS0 = 20) {
+  unif_p_all <- generate_unif_p_matrix(Data_conditions, ROUNDS = ROUNDS0)
+  print("General Statistics Setup: Done!")
+  result_indi_stats <- c()
+  result_data_stats <- c()
+  length_data_test_stats <- c()
+  gene_selected_names <- c()
+  print("LTMR2LR DEG test: Start! Progress per 500 genes:")
+  for (i in 1:length(Stat_list)) {
+    if (length(Stat_list[[i]]) == length(Data_conditions)) {
+      gene_selected_names <- c(gene_selected_names, names(Stat_list)[i])
+      result_indi_list <- list()
+      result_data_list <- list()
+      length_data_test_k <- c()
+      for (k in 1:ROUNDS0) {
+        indi_test_c <- c()
+        data_test_c <- c()
+        length_data_test_c <- c()
+        indi_all <- c()
+        for (j in 1:length(Data_conditions)) {
+          # gene_stat_c<-gene_stat_all[i,j]
+          gene_data <- Data_conditions[[j]][i, ]
+          ccc_stat <- Stat_list[[i]][[j]]
+          unif_p_c <- unif_p_all[[j]][k, ]
+          indi_c <- c()
+          if (sum(gene_data != 0) <= 1) {
+          indi_c <- gene_data * 0
+          indi_c[which(gene_data != 0)] <- 1
+          }
+          if (sum(gene_data != 0) > 1) {
+          gene_stat_c <- t(ccc_stat)
+          y <- gene_data
+          y0 <- log(y)
+          Zcut0 <- min(y0[which(y != 0)])
+          y0[which(y == 0)] <- Zcut0 - 2
+          pp <- calculate_prob_sep_Zcut(y0, Zcut0, gene_stat_c[1, ], gene_stat_c[2, ], gene_stat_c[3, ])
+          indi_c <- class_determination_2LR(pp, unif_p_c)
+          cut_pos<-max(gene_stat_c[2, 2]-2*gene_stat_c[3, 2],gene_stat_c[2, 1])
+          indi_c[which((apply(pp,2,sum)==0)&(y0>cut_pos))]<-1
+          indi_c[which((apply(pp,2,sum)==0)&(y0<=cut_pos))]<-0
+          }
+          names(indi_c) <- names(gene_data)
+          indi_all <- c(indi_all, indi_c)
+          DE_c <- Design_matrix0[j, ]
+          if (ncol(Design_matrix0) == 1) {
+          names(DE_c) <- colnames(Design_matrix0)
+          }
+          if ((sum(gene_data > 0) > 2) & (sum(indi_c == 1) > 1)) {
+          y <- gene_data
+          y0 <- log(y)
+          Zcut0 <- min(y0[which(y != 0)])
+          y0[which(y == 0)] <- Zcut0 - 2
+          log_data_c <- y0[which(indi_c == 1)]
+          data_test_c <- rbind(data_test_c, build_design_data(DE_c, log_data_c))
+          }
+          length_data_test_c <- c(length_data_test_c, sum(indi_c == 1))
+        }
+        indi_test_c <- t(rbind(indi_all, Conds_meta))
+        data_test_c <- as.data.frame(data_test_c)
+        colnames(indi_test_c)[1] <- "Gene_data"
+        indi_test_c <- as.data.frame(indi_test_c)
+        mod <- summary(glm(Gene_data ~ ., family = "binomial", data = indi_test_c))$coefficients
+        if (nrow(data_test_c) > 0) {
+          mod2 <- summary(glm(Gene_data ~ ., family = "gaussian", data = data_test_c))$coefficients
+        } else {
+          mod2 <- ""
+        }
+        result_indi_list[[k]] <- mod
+        result_data_list[[k]] <- mod2
+        length_data_test_k <- rbind(length_data_test_k, length_data_test_c)
+      }
+      tg_r_f <- matrix(0, ncol(Design_matrix0), 2)
+      tg_r_f[, 2] <- 2
+      rownames(tg_r_f) <- colnames(Design_matrix0)
+      colnames(tg_r_f) <- c("Sign", "p.value")
+      tg_n <- c()
+      tg_r <- c()
+      for (ii in 1:ncol(Design_matrix0)) {
+        ccc <- c()
+        t <- 0
+        for (j in 1:length(result_indi_list)) {
+          if (sum(rownames(result_indi_list[[j]]) == colnames(Design_matrix0)[ii]) > 0) {
+          ccc <- rbind(ccc, result_indi_list[[j]][colnames(Design_matrix0)[ii], c(1, 4)])
+          t <- t + 1
+          }
+        }
+        if (t > 0) {
+          sign <- mean(sign(ccc[, 1]))
+          pp <- median(ccc[, 2])
+          tg_n <- c(tg_n, colnames(Design_matrix0)[ii])
+          tg_r <- rbind(tg_r, c(sign, pp))
+        }
+      }
+      rownames(tg_r) <- tg_n
+      colnames(tg_r) <- c("Sign", "p.value")
+      tg_r[which(is.na(tg_r))] <- 1
+      tg_indi_r <- tg_r_f
+      if (length(tg_n) > 0) {
+        tg_indi_r[rownames(tg_r), ] <- tg_r
+      }
+      tg_n <- c()
+      tg_r <- c()
+      for (ii in 1:ncol(Design_matrix0)) {
+        ccc <- c()
+        t <- 0
+        for (j in 1:length(result_data_list)) {
+          if (sum(rownames(result_data_list[[j]]) == colnames(Design_matrix0)[ii]) > 0) {
+          ccc <- rbind(ccc, result_data_list[[j]][colnames(Design_matrix0)[ii], c(1, 4)])
+          t <- t + 1
+          }
+        }
+        if (t > 0) {
+          sign <- mean(sign(ccc[, 1]))
+          pp <- median(ccc[, 2])
+          tg_n <- c(tg_n, colnames(Design_matrix0)[ii])
+          tg_r <- rbind(tg_r, c(sign, pp))
+        }
+      }
+      tg_data_r <- tg_r_f
+      if (length(tg_n) > 0) {
+        rownames(tg_r) <- tg_n
+        colnames(tg_r) <- c("Sign", "p.value")
+        tg_r[which(is.na(tg_r))] <- 2
+        tg_data_r[rownames(tg_r), ] <- tg_r
+      }
+      ccc1 <- as.vector(t(tg_indi_r))
+      ccc2 <- as.vector(t(tg_data_r))
+      if (i%%500 == 1) {
+        print(i)
+      }
+      result_indi_stats <- rbind(result_indi_stats, ccc1)
+      result_data_stats <- rbind(result_data_stats, ccc2)
+      length_data_test_stats <- rbind(length_data_test_stats, apply(length_data_test_k, 2, mean))
+    }
+  }
+  print("Test Done!\nResults Adjustment.")
+  cn <- c()
+  for (i in 1:ncol(Design_matrix0)) {
+    cn <- c(cn, paste(c("Sign", "Pvalue"), colnames(Design_matrix0)[i], sep = "."))
+  }
+  colnames(result_indi_stats) <- cn
+  rownames(result_indi_stats) <- gene_selected_names
+  colnames(result_data_stats) <- cn
+  rownames(result_data_stats) <- gene_selected_names
+  colnames(length_data_test_stats) <- rownames(Design_matrix0)
+  rownames(length_data_test_stats) <- gene_selected_names
+  Reliable_Data_test_stats <- Reliable_Data_test(length_data_test_stats, Design_matrix0, num_cut = 4)
+  result_data_stats_final <- adjust_result_data_stats(result_data_stats, Reliable_Data_test_stats)
+  result_indi_stats_final <- adjust_result_indi_stats(result_indi_stats, Reliable_Data_test_stats)
+  ccc <- list(result_indi_stats_final, result_data_stats_final)
+  names(ccc) <- c("Bimodal test Result", "Expression level test Result")
+  return(ccc)
+  print("All Analysis Done!")
+}
+
+generate_unif_p_matrix <- function(Data_list, ROUNDS = 100) {
+  unif_p_all <- list()
+  for (i in 1:length(Data_list)) {
+    unif_p_c <- matrix(runif(ncol(Data_list[[i]]) * ROUNDS, 0, 1), ROUNDS, ncol(Data_list[[i]]))
+    colnames(unif_p_c) <- colnames(Data_list[[i]])
+    rownames(unif_p_c) <- 1:ROUNDS
+    unif_p_all[[i]] <- unif_p_c
+  }
+  names(unif_p_all) <- names(Data_list)
+  return(unif_p_all)
+}
+
+class_determination_2LR <- function(p_table, p_ref) {
+  p_table0 <- p_table
+  cc <- apply(p_table, 2, sum)
+  for (i in 1:nrow(p_table0)) {
+    p_table0[i, ] <- p_table0[i, ]/cc
+  }
+  return((p_table0[1, ] < p_ref) * 1)
+}
+
+build_design_data <- function(Design_c, yy) {
+  fff <- cbind(yy, matrix(Design_c, length(yy), length(Design_c), byrow = T))
+  colnames(fff) <- c("Gene_data", names(Design_c))
+  return(fff)
+}
+
+Reliable_Data_test <- function(length_data_test_stats0, Design_matrix0, num_cut = 4) {
+  ccc <- c()
+  for (i in 1:ncol(Design_matrix0)) {
+    tg_s1 <- names(which(Design_matrix0[, i] == 0))
+    tg_s2 <- names(which(Design_matrix0[, i] == 1))
+    if (length(tg_s1) > 1) {
+      ccc1 <- apply(length_data_test_stats0[, tg_s1], 1, sum)
+    } else {
+      ccc1 <- length_data_test_stats0[, tg_s1]
+    }
+    if (length(tg_s2) > 1) {
+      ccc2 <- apply(length_data_test_stats0[, tg_s2], 1, sum)
+    } else {
+      ccc2 <- length_data_test_stats0[, tg_s2]
+    }
+    ccc <- cbind(ccc, (ccc1 >= num_cut) & (ccc2 >= num_cut) * 1)
+  }
+  ccc <- ccc * 1
+  colnames(ccc) <- colnames(Design_matrix0)
+  return(ccc)
+}
+
+adjust_result_data_stats <- function(result_data_stats, Reliable_Data_test_stats) {
+  # par(mfcol=c(3,3))
+  result_data_stats0 <- result_data_stats
+  result_data_stats1 <- c()
+  for (i in 1:ncol(Reliable_Data_test_stats)) {
+    tg_id <- paste("Pvalue", colnames(Reliable_Data_test_stats)[i], sep = ".")
+    tg_id1 <- paste("Sign", colnames(Reliable_Data_test_stats)[i], sep = ".")
+    tg_id2 <- paste("FDR", colnames(Reliable_Data_test_stats)[i], sep = ".")
+    # hist(result_data_stats[,tg_id],main=paste(tg_id,'Data Test\nOriginal P'),xlab='p, 2 for NA test',col='lightblue')
+    result_data_stats0[which(Reliable_Data_test_stats[, i] == 0), tg_id] <- 2
+    # hist(result_data_stats0[,tg_id],main=paste(tg_id,'Data Test\nReliable P'),xlab='p, 2 for NA test',col='lightblue')
+    result_data_stats0[, tg_id1] <- sign(result_data_stats0[, tg_id1])
+    result_data_stats1 <- cbind(result_data_stats1, result_data_stats0[, tg_id1])
+    colnames(result_data_stats1)[ncol(result_data_stats1)] <- tg_id1
+    result_data_stats1 <- cbind(result_data_stats1, result_data_stats0[, tg_id])
+    colnames(result_data_stats1)[ncol(result_data_stats1)] <- tg_id
+    result_data_stats0[which(result_data_stats0[, tg_id] <= 1), tg_id] <- p.adjust(result_data_stats0[which(result_data_stats0[, 
+      tg_id] <= 1), tg_id], method = "fdr")
+    result_data_stats1 <- cbind(result_data_stats1, result_data_stats0[, tg_id])
+    colnames(result_data_stats1)[ncol(result_data_stats1)] <- tg_id2
+    # hist(result_data_stats0[,tg_id],main=paste(tg_id,'Data Test\nReliable FDR'),xlab='FDR, 2 for NA test',col='lightblue')
+  }
+  return(result_data_stats1)
+}
+
+adjust_result_indi_stats <- function(result_indi_stats, Reliable_Data_test_stats) {
+  # par(mfcol=c(2,3))
+  result_indi_stats0 <- result_indi_stats
+  result_indi_stats1 <- c()
+  for (i in 1:ncol(Reliable_Data_test_stats)) {
+    tg_id <- paste("Pvalue", colnames(Reliable_Data_test_stats)[i], sep = ".")
+    tg_id1 <- paste("Sign", colnames(Reliable_Data_test_stats)[i], sep = ".")
+    tg_id2 <- paste("FDR", colnames(Reliable_Data_test_stats)[i], sep = ".")
+    # hist(result_indi_stats[,tg_id],main=paste(tg_id,'Data Test\nOriginal P'),xlab='p',col='lightblue')
+    result_indi_stats0[, tg_id1] <- sign(result_indi_stats0[, tg_id1])
+    result_indi_stats1 <- cbind(result_indi_stats1, result_indi_stats0[, tg_id1])
+    colnames(result_indi_stats1)[ncol(result_indi_stats1)] <- tg_id1
+    result_indi_stats1 <- cbind(result_indi_stats1, result_indi_stats0[, tg_id])
+    colnames(result_indi_stats1)[ncol(result_indi_stats1)] <- tg_id
+    result_indi_stats0[which(result_indi_stats0[, tg_id] <= 1), tg_id] <- p.adjust(result_indi_stats0[which(result_indi_stats0[, 
+      tg_id] <= 1), tg_id], method = "fdr")
+    result_indi_stats1 <- cbind(result_indi_stats1, result_indi_stats0[, tg_id])
+    colnames(result_indi_stats1)[ncol(result_indi_stats1)] <- tg_id2
+    # hist(result_indi_stats0[,tg_id],main=paste(tg_id,'Data Test\nReliable FDR'),xlab='FDR, 2 for NA test',col='lightblue')
+  }
+  return(result_indi_stats1)
+}
+```
+
+``` {R, cache = TRUE}
+calculate_prob_sep_Zcut <- function(data1, Zcut, a, u, sig) {
+  cc <- matrix(0, length(a), length(data1))
+  colnames(cc) <- names(data1)
+  for (i in 1:length(a)) {
+    c <- a[i] / sig[i] * exp(-(data1 - u[i]) ^ 2 / (2 * sig[i] ^ 2))
+    cc[i, ] <- c
+  }
+  cut_p <- rep(0, length(a))
+  for (i in 1:length(a)) {
+    cut_p[i] <- a[i] * pnorm(Zcut, u[i], sig[i])
+  }
+  for (i in 1:ncol(cc)) {
+    if (data1[i] < Zcut) {
+      cc[, i] <- cut_p
+    }
+  }
+  cc[which(is.na(cc) == 1)] <- 0
+  return(cc)
+}
+```
+
+```{R}
+UB <- max(log(Data_0)) + 1
+LB <- min(log(Data_0[which(Data_0 > 0)])) - 1
+```
+
+``` {R, cache = TRUE}
+M <- length(Data_list_new)
+genes <- head(tg_genes)
+results <- list()
+for (gene in genes) {
+  Zcut_c <- c()
+  xx <- vector(mode = "list", length = M)
+  for (j in 1:M) {
+    data <- Data_list_new[[j]][gene, ]
+    xx[[j]] <- log(data)
+    ddd <- data[which(data != 0)]
+    if(length(ddd) > 0) {
+      Zcut_c <- c(Zcut_c, min(ddd))
+    }
+  }
+  Zcut0 <- log(max(Zcut_c))
+  if (max(sapply(xx, function (x) sum(x > Zcut0))) > 5) {
+    results[[gene]] <- LTMGSCA::SeparateKRpkmNewLR(xx, 2500, Zcut0, 10, M = UB, m = LB)
+  } else {
+    warning(sprintf("The total number of longest elements after the cutoff in %s is %d, too small, skipped.\n", gene, max(sapply(xx, function (x) sum(x > Zcut0)))))
+  }
+}
+print(results)
+save(results, file = "deg.head.RData")
+```
+
+``` {R, cache = TRUE}
+load("deg.head.RData")
+LTMG_2LR_test_results <- LTMG2LR_DEG_test_new(Data_conditions = Data_list_new, Stat_list = results, Conds_meta, Design_matrix0 = Design_matrix_new)
+LTMG_2LR_test_results
+```
+
+``` {R, cache = TRUE}
+M <- length(Data_list_new)
+genes <- head(tg_genes)
+results <- list()
+for (gene in c("ENSG00000138698", "ENSG00000124243", "ENSG00000067606", "ENSG00000064490")) {
+  Zcut_c <- c()
+  xx <- vector(mode = "list", length = M)
+  for (j in 1:M) {
+    data <- Data_list_new[[j]][gene, ]
+    xx[[j]] <- log(data)
+    ddd <- data[which(data != 0)]
+    if(length(ddd) > 0) {
+      Zcut_c <- c(Zcut_c, min(ddd))
+    }
+  }
+  Zcut0 <- log(max(Zcut_c))
+  if (max(sapply(xx, function (x) sum(x > Zcut0))) > 5) {
+    results[[gene]] <- LTMGSCA::SeparateKRpkmNewLR(xx, 2500, Zcut0, 10, M = UB, m = LB)
+  } else {
+    warning(sprintf("The total number of longest elements after the cutoff in %s is %d, too small, skipped.\n", gene, max(sapply(xx, function (x) sum(x > Zcut0)))))
+  }
+}
+print(results)
+```
+
+``` {R, cache = TRUE}
+if (file.exists("deg.RData")){
+  load("deg.RData")
+} else {
+  M <- length(Data_list_new)
+  genes <- head(tg_genes)
+  results <- list()
+  library(doParallel)
+  registerDoParallel(cores = 63)
+  system.time(results <- foreach (gene = 1:length(Data_list_new[[1]][,1])) %dopar% {
+    Zcut_c <- c()
+    xx <- vector(mode = "list", length = M)
+    for (j in 1:M) {
+      data <- Data_list_new[[j]][gene, ]
+      xx[[j]] <- log(data)
+      ddd <- data[which(data != 0)]
+      if(length(ddd) > 0) {
+        Zcut_c <- c(Zcut_c, min(ddd))
+      }
+    }
+    Zcut0 <- log(max(Zcut_c))
+    if (max(sapply(xx, function (x) sum(x > Zcut0))) > 5) {
+      result <- LTMGSCA::SeparateKRpkmNewLR(xx, 2500, Zcut0, 10, M = UB, m = LB)
+    } else {
+      warning(sprintf("The total number of longest elements after the cutoff in %s is %d, too small, skipped.\n", gene, max(sapply(xx, function (x) sum(x > Zcut0)))))
+      NA
+    }
+  })
+  names(results) <- row.names(Data_list_new[[1]])
+  save(results, file = "deg.RData")
+}
+```
+
+``` {R, cache = TRUE}
+if (file.exists("LTMG_2LR_test_results.RData")) {
+  load("LTMG_2LR_test_results.RData")
+} else {
+  LTMG_2LR_test_results <- LTMG2LR_DEG_test_new(Data_conditions = Data_list_new, Stat_list = results, Conds_meta, Design_matrix0 = Design_matrix_new)
+  save(LTMG_2LR_test_results, file = "LTMG_2LR_test_results.RData")
+}
+head(LTMG_2LR_test_results[[1]])
+```
