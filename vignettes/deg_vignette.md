@@ -51,10 +51,10 @@ selected.genes <- which(rowSums(Data_0 > 0) > 5)
 print(head(selected.genes))
 ```
 
-    ## ENSG00000000003 ENSG00000000419 ENSG00000000457 
-    ##               1               2               3 
-    ## ENSG00000000460 ENSG00000001036 ENSG00000001084 
-    ##               4               5               6
+    ## ENSG00000000003 ENSG00000000419 ENSG00000000457 ENSG00000000460 
+    ##               1               2               3               4 
+    ## ENSG00000001036 ENSG00000001084 
+    ##               5               6
 
 ### Run LTMG for the selected genes
 
@@ -71,8 +71,8 @@ for (k in 1:5) {
 }
 ```
 
-    ##        p mean  sd
-    ## [1,] NaN  NaN NaN
+    ##       p        mean       sd
+    ## H6S48 1 -0.08432351 1.608029
     ##                p       mean        sd
     ## D12S92 0.7931081 -0.6102489 1.5938134
     ## E2S13  0.2068919  1.6048043 0.4993873
@@ -101,8 +101,8 @@ for (gene in head(selected.genes, 3)) {
 }
 ```
 
-    ##        p mean  sd
-    ## [1,] NaN  NaN NaN
+    ##           p      mean       sd
+    ## E7_tophat 1 0.1306459 3.509946
     ##                    p      mean        sd
     ## D11_tophat 0.5723978 -2.635281 3.0894008
     ## B11_tophat 0.4276022  3.325011 0.8752331
@@ -121,8 +121,8 @@ for (gene in head(selected.genes, 3)) {
     ## E7_tophat  0.18517254  2.9234073 0.6279871
     ## B11_tophat 0.21565872  3.9565514 0.5087092
     ## H6S48      0.03455954  2.4333741 0.7206418
-    ##        p mean  sd
-    ## [1,] NaN  NaN NaN
+    ##       p     mean     sd
+    ## E3S21 1 3.725957 1.6725
     ##                    p     mean        sd
     ## D10_tophat 0.3642125 2.256809 2.1311411
     ## H4S32      0.6357875 4.520245 0.6621172
@@ -141,8 +141,8 @@ for (gene in head(selected.genes, 3)) {
     ## E3S21      0.23737559  4.342121 1.017228
     ## H4S32      0.35983483  4.732033 0.441166
     ## C8S59      0.01845084  3.049268 1.201308
-    ##        p mean  sd
-    ## [1,] NaN  NaN NaN
+    ##       p      mean       sd
+    ## G5S39 1 -4.335319 4.655417
     ##                   p      mean       sd
     ## E5_tophat 0.8086962 -5.680103 3.489590
     ## E2_tophat 0.1913038  2.042491 1.083593
@@ -209,18 +209,24 @@ BIC_f_zcut2 <- function(y, rrr, Zcut) {
 We can now get `f` value using `BIC_f_zcut2()`.
 
 ``` r
-x <- log(Data_0[3, ])
+x <- Data_0[3, ]
 for (k in 1:5) {
   rrr <- LTMGSCA::SeparateKRpkmNew(x = x, n = 100, q = min(x[which(x > 0)]), k = k, err = 1e-10)
-  print(BIC_f_zcut2(y = x, rrr, 0))
+  print(BIC_f_zcut2(y = log(x), rrr, 0))
 }
 ```
 
-    ## [1] NaN
-    ## [1] -239.9958
-    ## [1] -249.6868
-    ## [1] -263.7971
-    ## [1] -278.6692
+    ## [1] -309.9112
+    ## [1] -267.1401
+    ## [1] -309.7542
+    ## [1] -318.244
+    ## [1] -327.8927
+
+``` r
+warning("the BIC values the bigger the better.")
+```
+
+    ## Warning: the BIC values the bigger the better.
 
 ``` r
 GetAll <- function(x, n, q, err = 1e-10){
@@ -243,12 +249,12 @@ for (gene in head(selected.genes)) {
 }
 ```
 
-    ## [1]       NaN -416.9971 -430.2137 -444.9029 -459.2205
-    ## [1]       NaN -502.9691 -516.4182 -530.9423 -546.1785
-    ## [1]       NaN -239.9958 -249.6868 -263.7971 -278.6692
-    ## [1]       NaN -240.9116 -254.0739 -269.2577 -285.1277
-    ## [1]       NaN -360.5330 -375.4155 -390.9027 -406.1373
-    ## [1]       NaN -322.4441 -333.2063 -342.9011 -357.0400
+    ## [1] -438.7668 -416.9971 -430.2137 -444.9029 -459.2205
+    ## [1] -520.3735 -502.9691 -516.4182 -530.9423 -546.1785
+    ## [1] -229.7269 -239.9958 -249.6868 -263.7971 -278.6692
+    ## [1] -231.6531 -240.9116 -254.0739 -269.2577 -285.1277
+    ## [1] -364.9162 -360.5330 -375.4155 -390.9027 -406.1373
+    ## [1] -316.9355 -322.4441 -333.2063 -342.9011 -357.0400
 
 ## running LTMG-2LR for the genes fitted with less than 2 peaks in (ii)
 
@@ -400,8 +406,8 @@ tg_ids <- 1:5
 ret <- Build_design_matrix_data_DGE(Data_list, tg_conds_meta, tg_ids)
 ```
 
-    ## Warning in summary.lm(lm(current.t0 ~ tg_conds_meta1 + 0)):
-    ## essentially perfect fit: summary may be unreliable
+    ## Warning in summary.lm(lm(current.t0 ~ tg_conds_meta1 + 0)): essentially
+    ## perfect fit: summary may be unreliable
 
 ``` r
 Design_matrix0 <- ret[[1]]
@@ -916,50 +922,36 @@ LTMG_2LR_test_results
 ```
 
     ## $`Bimodal test Result`
-    ##                 Sign.Si    Pvalue.Si       FDR.Si Sign.H
-    ## ENSG00000000003      -1 0.5488206054 0.7106359695     -1
-    ## ENSG00000000419       1 0.0212521943 0.0637565828      1
-    ## ENSG00000000457      -1 0.5921966413 0.7106359695     -1
-    ## ENSG00000000460      -1 0.8159206489 0.8159206489     -1
-    ## ENSG00000001036      -1 0.0957977857 0.1915955715      1
-    ## ENSG00000001084      -1 0.0001321381 0.0007928288      1
-    ##                   Pvalue.H     FDR.H Sign.Si__H
-    ## ENSG00000000003 0.64007755 0.9912313         -1
-    ## ENSG00000000419 0.99031581 0.9912313         -1
-    ## ENSG00000000457 0.09540018 0.4018299         -1
-    ## ENSG00000000460 0.13394330 0.4018299         -1
-    ## ENSG00000001036 0.76243558 0.9912313         -1
-    ## ENSG00000001084 0.99123126 0.9912313         -1
-    ##                 Pvalue.Si__H FDR.Si__H
-    ## ENSG00000000003    0.0187075 0.1122450
-    ## ENSG00000000419    0.9890624 0.9931511
-    ## ENSG00000000457    0.1182435 0.3547305
-    ## ENSG00000000460    0.8707557 0.9931511
-    ## ENSG00000001036    0.3758995 0.7517990
-    ## ENSG00000001084    0.9931511 0.9931511
+    ##                 Sign.Si    Pvalue.Si       FDR.Si Sign.H  Pvalue.H
+    ## ENSG00000000003      -1 0.4548957161 0.6823435741     -1 0.4381188
+    ## ENSG00000000419       1 0.0212521943 0.0637565828      1 0.9902658
+    ## ENSG00000000457      -1 0.5921966413 0.7106359695     -1 0.0968549
+    ## ENSG00000000460      -1 0.8000573186 0.8000573186     -1 0.1339433
+    ## ENSG00000001036      -1 0.0957977857 0.1915955715      1 0.6917904
+    ## ENSG00000001084      -1 0.0001129087 0.0006774521      1 0.9911513
+    ##                     FDR.H Sign.Si__H Pvalue.Si__H FDR.Si__H
+    ## ENSG00000000003 0.8762375         -1   0.02149541 0.1289725
+    ## ENSG00000000419 0.9911513         -1   0.98899749 0.9931079
+    ## ENSG00000000457 0.4018299         -1   0.10332762 0.3099829
+    ## ENSG00000000460 0.4018299         -1   0.87075565 0.9931079
+    ## ENSG00000001036 0.9911513         -1   0.34473687 0.6894737
+    ## ENSG00000001084 0.9911513         -1   0.99310793 0.9931079
     ## 
     ## $`Expression level test Result`
-    ##                 Sign.Si    Pvalue.Si       FDR.Si Sign.H
-    ## ENSG00000000003       1 1.678037e-01 0.3356074683      1
-    ## ENSG00000000419       1 5.354716e-01 0.5354715505     -1
-    ## ENSG00000000457       1 3.707993e-01 0.4449592051     -1
-    ## ENSG00000000460      -1 3.125128e-01 0.4449592051     -1
-    ## ENSG00000001036       1 1.237746e-01 0.3356074683     -1
-    ## ENSG00000001084       1 2.702335e-05 0.0001621401      1
-    ##                    Pvalue.H      FDR.H Sign.Si__H
-    ## ENSG00000000003 0.007660393 0.04596236          1
-    ## ENSG00000000419 0.059791023 0.17937307          1
-    ## ENSG00000000457 0.125336431 0.25067286          1
-    ## ENSG00000000460 0.941542215 0.97357180         -1
-    ## ENSG00000001036 0.565425577 0.84813836          1
-    ## ENSG00000001084 0.973571803 0.97357180         -1
-    ##                 Pvalue.Si__H    FDR.Si__H
-    ## ENSG00000000003 7.267382e-01 7.267382e-01
-    ## ENSG00000000419 1.968425e-01 4.921062e-01
-    ## ENSG00000000457 2.000000e+00 2.000000e+00
-    ## ENSG00000000460 5.568584e-01 6.960730e-01
-    ## ENSG00000001036 4.468469e-01 6.960730e-01
-    ## ENSG00000001084 7.723847e-06 3.861924e-05
+    ##                 Sign.Si    Pvalue.Si       FDR.Si Sign.H    Pvalue.H
+    ## ENSG00000000003       1 1.783466e-01 0.3566932391      1 0.005257645
+    ## ENSG00000000419       1 5.291394e-01 0.5291393957     -1 0.056698154
+    ## ENSG00000000457       1 3.725074e-01 0.4470088705     -1 0.104438903
+    ## ENSG00000000460      -1 3.153214e-01 0.4470088705     -1 0.939970221
+    ## ENSG00000001036       1 1.312766e-01 0.3566932391     -1 0.423930813
+    ## ENSG00000001084       1 2.602198e-05 0.0001561319      1 0.949910819
+    ##                      FDR.H Sign.Si__H Pvalue.Si__H    FDR.Si__H
+    ## ENSG00000000003 0.03154587          0 7.810740e-01 7.810740e-01
+    ## ENSG00000000419 0.17009446          1 1.336200e-01 3.340501e-01
+    ## ENSG00000000457 0.20887781          1 2.000000e+00 2.000000e+00
+    ## ENSG00000000460 0.94991082         -1 5.568584e-01 6.960730e-01
+    ## ENSG00000001036 0.63589622          1 3.890242e-01 6.483736e-01
+    ## ENSG00000001084 0.94991082         -1 6.284695e-06 3.142348e-05
 
 ``` r
 M <- length(Data_list_new)
@@ -1121,27 +1113,198 @@ if (file.exists("LTMG_2LR_test_results.RData")) {
   LTMG_2LR_test_results <- LTMG2LR_DEG_test_new(Data_conditions = Data_list_new, Stat_list = results, Conds_meta, Design_matrix0 = Design_matrix_new)
   save(LTMG_2LR_test_results, file = "LTMG_2LR_test_results.RData")
 }
+```
+
+    ## [1] "General Statistics Setup: Done!"
+    ## [1] "LTMR2LR DEG test: Start! Progress per 500 genes:"
+    ## [1] 1
+    ## [1] 501
+
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+
+    ## [1] 1001
+    ## [1] 1501
+    ## [1] 2001
+    ## [1] 3001
+    ## [1] 3501
+    ## [1] 4001
+    ## [1] 4501
+    ## [1] 5501
+    ## [1] 6001
+    ## [1] 6501
+    ## [1] 7001
+    ## [1] 7501
+    ## [1] 8001
+    ## [1] 9501
+    ## [1] 10001
+    ## [1] 11001
+    ## [1] 11501
+    ## [1] 12001
+
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+
+    ## [1] 14001
+
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+
+    ## [1] 14501
+    ## [1] 15001
+
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+
+    ## [1] 16001
+
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+    
+    ## Warning: glm.fit: algorithm did not converge
+
+    ## [1] 17001
+    ## [1] 18001
+    ## [1] "Test Done!\nResults Adjustment."
+
+``` r
 head(LTMG_2LR_test_results[[1]])
 ```
 
-    ##                 Sign.Si    Pvalue.Si      FDR.Si Sign.H
-    ## ENSG00000000003      -1 0.7373114893 1.000000000     -1
-    ## ENSG00000000419       1 0.0212521943 0.110001220      1
-    ## ENSG00000000457      -1 0.7230569531 0.992222965     -1
-    ## ENSG00000000460      -1 0.8159206489 1.000000000     -1
-    ## ENSG00000001036      -1 0.0957977857 0.300654953      1
-    ## ENSG00000001084      -1 0.0001129087 0.002269553      1
-    ##                  Pvalue.H     FDR.H Sign.Si__H Pvalue.Si__H
-    ## ENSG00000000003 0.5944713 0.9026139         -1  0.008951548
-    ## ENSG00000000419 0.9902658 1.0000000         -1  0.989075964
-    ## ENSG00000000457 0.1013051 0.2948821         -1  0.100710344
-    ## ENSG00000000460 0.1339433 0.3573691         -1  0.896788737
-    ## ENSG00000001036 0.6917904 0.9699528         -1  0.344736871
-    ## ENSG00000001084 0.9911513 1.0000000         -1  0.993107931
-    ##                 FDR.Si__H
-    ## ENSG00000000003 0.1141071
-    ## ENSG00000000419 1.0000000
-    ## ENSG00000000457 0.4594235
-    ## ENSG00000000460 1.0000000
-    ## ENSG00000001036 0.8567342
-    ## ENSG00000001084 1.0000000
+    ##                 Sign.Si    Pvalue.Si      FDR.Si Sign.H  Pvalue.H
+    ## ENSG00000000003      -1 0.5128032111 0.859543032     -1 0.4381188
+    ## ENSG00000000419       1 0.0176391579 0.095725430      1 0.9902172
+    ## ENSG00000000457      -1 0.7230569531 0.986305554     -1 0.1005297
+    ## ENSG00000000460      -1 0.8159206489 1.000000000     -1 0.1339433
+    ## ENSG00000001036      -1 0.0957977857 0.298526292      1 0.6917904
+    ## ENSG00000001084      -1 0.0001129087 0.002280327      1 0.9911513
+    ##                     FDR.H Sign.Si__H Pvalue.Si__H FDR.Si__H
+    ## ENSG00000000003 0.7566159         -1   0.02004718 0.1888429
+    ## ENSG00000000419 1.0000000         -1   0.98894743 1.0000000
+    ## ENSG00000000457 0.2940334         -1   0.10267401 0.4719233
+    ## ENSG00000000460 0.3581176         -1   0.89678874 1.0000000
+    ## ENSG00000001036 0.9676070         -1   0.34473687 0.8621123
+    ## ENSG00000001084 1.0000000         -1   0.99310793 1.0000000

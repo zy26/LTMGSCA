@@ -135,11 +135,12 @@ BIC_f_zcut2 <- function(y, rrr, Zcut) {
 We can now get ```f``` value using ```BIC_f_zcut2()```.
 
 ``` {R, cache = TRUE}
-x <- log(Data_0[3, ])
+x <- Data_0[3, ]
 for (k in 1:5) {
   rrr <- LTMGSCA::SeparateKRpkmNew(x = x, n = 100, q = min(x[which(x > 0)]), k = k, err = 1e-10)
-  print(BIC_f_zcut2(y = x, rrr, 0))
+  print(BIC_f_zcut2(y = log(x), rrr, 0))
 }
+warning("the BIC values the bigger the better.")
 ```
 
 ``` {R, cache = TRUE}
