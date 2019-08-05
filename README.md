@@ -6,7 +6,7 @@ LTMGSCA is a left truncated mixture Gaussian (LTMG) model-based single cell RNA-
 
 ![Pipeline](vignettes/pipeline.svg)
 
-We compared LTMG with other state-of-art scRNA-seq models on a comprehensive set of human scRNA-seq data. LTMG in general achieved best goodness of fitting among them (lower KS value means better fitting performance). More detailed illustration could be found at https://www.biorxiv.org/content/early/2018/09/29/430009.
+We compared LTMG with other state-of-art scRNA-seq models on a comprehensive set of human scRNA-seq data. LTMG in general achieved best goodness of fitting among them (lower KS value means better fitting performance). More detailed illustration could be found at https://academic.oup.com/nar/advance-article/doi/10.1093/nar/gkz655/5542876.
 
 ![Compare](vignettes/compare.svg)
 
@@ -29,3 +29,7 @@ devtools::install_github("zy26/LTMGSCA")
 To see the demonstration of LTMG - DEG track, please choose between [.md file](vignettes/deg_vignette.md) and [.pdf file](vignettes/deg_vignette.pdf).
 
 To see the demonstration of LTMG - GCR track, please choose between [.md file](vignettes/gcr_vignette.md) and [.pdf file](vignettes/gcr_vignette.pdf).
+
+
+## How to cite
+Wan, Changlin, Wennan Chang, Yu Zhang, Fenil Shah, Xiaoyu Lu, Yong Zang, Anru Zhang et al. "LTMG: a novel statistical modeling of transcriptional expression states in single-cell RNA-Seq data." Nucleic Acids Research (2019).
