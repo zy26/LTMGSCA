@@ -1,5 +1,6 @@
+# Update
+We have received lots of comments and updated our package thoroughly. Please visit the new [website](https://github.com/clwan/LTMGSCA) (https://github.com/clwan/LTMGSCA). 
 # LTMGSCA
-
 This repository contains the R codes which could reproduce the results of "LTMG: A statistical model of transcriptional regulatory states in single cell RNA-Seq data" by Changlin Wan, Wennan Chang, Yu Zhang, Fenil Shah, Sha Cao, Melissa L. Fishel, Qin Ma, and Chi Zhang.
 
 LTMGSCA is a left truncated mixture Gaussian (LTMG) model-based single cell RNA-seq analysis pipeline that can accurately infer the modality and distribution of individual gene’s expression profile in scRNA-seq data, while decrease the impact from dropout and low expression value.  Enabled by LTMG, a differential expression test and a gene co-regulation module identification method, namely LTMG-DGE and LTMG-GCR, are further developed and incorporated within the framework.
@@ -9,6 +10,7 @@ LTMGSCA is a left truncated mixture Gaussian (LTMG) model-based single cell RNA-
 We compared LTMG with other state-of-art scRNA-seq models on a comprehensive set of human scRNA-seq data. LTMG in general achieved best goodness of fitting among them (lower KS value means better fitting performance). More detailed illustration could be found at https://academic.oup.com/nar/advance-article/doi/10.1093/nar/gkz655/5542876.
 
 ![Compare](vignettes/compare.svg)
+
 
 
 ## Installation
