@@ -1,5 +1,5 @@
 # Update
-We have received lots of comments and updated our package thoroughly. Please visit the new [website](https://github.com/clwan/LTMGSCA) (https://github.com/clwan/LTMGSCA). 
+We have received lots of comments and updated our package thoroughly. Please visit the new [website](https://github.com/clwan/LTMGSCA) (https://github.com/clwan/LTMG). 
 # LTMGSCA
 This repository contains the R codes which could reproduce the results of "LTMG: A statistical model of transcriptional regulatory states in single cell RNA-Seq data" by Changlin Wan, Wennan Chang, Yu Zhang, Fenil Shah, Sha Cao, Melissa L. Fishel, Qin Ma, and Chi Zhang.
 
